@@ -77,8 +77,8 @@ write_csv(ImputedData_no_negative,"../Processed_data/Imputed_data.csv")
 
 
 ```{r}
-describe(ImputedData) %>%
-  rownames_to_column(.,"variable_name") %>%
+bind_cols(data.frame(row.names(psych::describe(ImputedData))), data.frame(psych::describe(ImputedData))) %>%
+  rename("varnames"=1) %>%  
   write_csv(.,"../Processed_data/summary_after_imputed_normalization.csv")
 ```
 
