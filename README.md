@@ -15,6 +15,8 @@ Following packages must be installed for the script to work:
 - GPArotation
 - lavaan
 - sf
+- skimr (For viewing data summary)
+- DescTools 
 
 
 
