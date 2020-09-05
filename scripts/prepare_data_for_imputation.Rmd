@@ -1,0 +1,114 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(psych)
+# require(devtools)
+# install_version("mnormt", version = "1.5-7", repos = "http://cran.us.r-project.org")
+```
+
+# Read processed data
+** These columns are removed because of 0.70 correlation with other columns**
+- Gain index
+- urban_percent
+** These columns are removed because they are missing more than 30% data **
+- Percent population internally displaced due  to conflict and violence
+- Percent population internally displaced by a disaster
+
+
+```{r}
+(mod_comb_2017 <- read_csv("../Processed_data/combined_final_data_frame.csv") %>%
+   dplyr::select(-gain_index_value,-percent_dis_conflict_population,-percent_dis_disaster_population,-urban_percent))
+```
+
+
+** Higher MCV1_percent_coverage is better **
+** Higher HDI index is better **
+** Higher climate risk index is better **
+** Higher overall_vaccine_confidence_percent is better **
+** Lower peace index value is better **
+** Lower percent_refugee_origin_population is better **
+** Lower measles_incidence_rate_per_100_000 is better **
+
+```{r}
+ describe(mod_comb_2017) %>%
+  as_tibble(rownames = "id") %>%
+  filter(!is.nan(mean)) %>%
+  select(id,min,max)
+```
+
+# Final vaccine risk index ranking with climate change
+```{r}
+(
+  mod_comb_2017 %>%
+    dplyr::select(-Year) %>%
+    mutate(
+      measles_incidence_rate_per_100_000 = scales::rescale(measles_incidence_rate_per_100_000, to =
+                                                             c(0, 1))
+    ) %>%
+    mutate(climate_risk_index = scales::rescale(climate_risk_index, to = c(0, 1))) %>%
+    
+    mutate(peace_index_score = scales::rescale(peace_index_score, to =
+                                                 c(0, 1))) %>%
+    
+    mutate_at(
+      vars(
+        MCV1_percent_coverage,
+        percent_refugee_origin_population
+      ),
+      funs(. / 100)
+    ) %>%
+    
+    # Convert negative factors into numbers where higher values indicates positive change
+    # Since numbers are scaled from 0-1, we can subtract the values from 1 to get the values from 0 to 1  so that implies lower values into better ranking
+    
+    mutate_at (
+      vars(
+        MCV1_percent_coverage,
+        climate_risk_index,
+        HDI_index_value,
+        overall_vaccine_confidence_percent
+      ),
+      funs(1 - .)
+    )   %>%
+    
+    mutate (
+      na_count = dplyr::select(
+        .,
+        MCV1_percent_coverage,
+        overall_vaccine_confidence_percent,
+        climate_risk_index,
+        HDI_index_value,
+        percent_refugee_origin_population,
+        measles_incidence_rate_per_100_000,
+        peace_index_score
+      ) %>% pmap_dbl(~ sum(is.na(c(
+        ...
+      ))))
+    ) %>%
+    
+    filter(na_count < 2) %>% #Remove countries missing more than 1 column of data
+    
+    dplyr::select(
+      Continent,
+      ISO_code,
+      Cname,
+      MCV1_percent_coverage,
+      overall_vaccine_confidence_percent,
+      climate_risk_index,
+      HDI_index_value,
+      percent_refugee_origin_population,
+      measles_incidence_rate_per_100_000,
+      peace_index_score
+    )  %>%
+    write_csv(
+      .,
+      "../Processed_data/tentative_vaccine_risk_data.csv"
+    )
+)
+```

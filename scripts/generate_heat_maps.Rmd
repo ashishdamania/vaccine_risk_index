@@ -1,0 +1,112 @@
+
+
+
+```{r}
+library(tidyverse)
+library(sf)
+```
+
+
+
+
+## Draw heatmap based on the ranking without climate change
+
+In 4 percentiles
+```{r}
+world_shape <- sf::st_read("../Data/ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp") 
+```
+
+
+
+```{r}
+# choose a point on the surface of each geometry
+nc3_points <- sf::st_point_on_surface(world_shape)
+nc3_coords <- as.data.frame(sf::st_coordinates(nc3_points))
+nc3_coords$ISO_A3_EH <- world_shape$ISO_A3_EH
+nc3_coords$CNTRY_NAME <- world_shape$SOVEREIGNT
+
+nc3_coords <- nc3_coords %>%
+  mutate(ISO_A3_EH = as.character(ISO_A3_EH))
+```
+
+
+
+#countries list
+```{r}
+country_list <- read_csv("../Processed_data/imputed_vaccine_index_using_factor_analysis_weight.csv")
+```
+
+
+#Find countries whose code does not match
+```{r}
+nc_label <- nc3_coords %>%
+  inner_join(country_list,by= c("ISO_A3_EH"="ISO_code"))
+```
+
+We find that about one country is  matching due to "varying" name
+
+```{r}
+nc3_coords %>%
+  right_join(country_list,by= c("ISO_A3_EH"="ISO_code")) %>%
+  filter(is.na(Y)) %>%
+  arrange(CNTRY_NAME)
+```
+
+
+
+# Change the ISO code to match with the vaccine risk index data
+```{r}
+nc3_coords <- nc3_coords %>%
+  arrange(CNTRY_NAME) %>%
+  mutate(ISO_A3_EH =
+           case_when(CNTRY_NAME == "Norway" ~ "NOR",
+                     TRUE ~ as.character(ISO_A3_EH)))
+```
+
+
+
+
+
+# Heatmap with imputed data
+
+
+## Heatmap with Factor analysis
+```{r}
+
+country_list_with_climate_imputed_factor <- read_csv("../Processed_data/imputed_vaccine_index_using_factor_analysis_weight.csv")
+
+world_shape %>%
+  mutate(ISO_A3_EH = 
+           case_when(NAME == "Norway" ~ "NOR",
+                     TRUE ~ as.character(ISO_A3_EH)
+           )) %>%
+  inner_join(country_list_with_climate_imputed_factor,by= c("ISO_A3_EH"="ISO_code")) %>%
+  mutate(quartile= case_when(
+    rank < 26 ~ "Top 25",
+    rank > 25 & rank < 51 ~ "26-50",
+    rank > 50 & rank < 100 ~ "51-99",
+    rank > 99 & rank < 125 ~ "100-124",
+    rank > 124 & rank < 200 ~ "125-150"
+  )) %>%
+  # select(Cname,quartile) %>%
+  # data.frame()
+  ggplot(.) +
+  geom_sf(data=world_shape, fill=NA, color="black", lwd=0.3) +
+  geom_sf(aes(fill = quartile),lwd=0.1) + 
+  # coord_sf(xlim = c(-60, -120), ylim = c(-7, 33), expand = FALSE))+
+  scale_fill_manual(values = rev(RColorBrewer::brewer.pal(5, "Reds")),
+                    #name="",
+                    breaks=c("Top 25","26-50", "51-99", "100-124","125-150"),
+                    labels=c("Top 25" ,"26-50", "51-99", "100-124","125-150")) +
+  theme_bw() +
+  theme(panel.grid.major = element_line(color = "transparent"))+ #Removes gridlines
+  theme(panel.border = element_blank())+
+  #ggtitle("Heatmap Vaccine risk index Ranking (Factor Analysis)")
+  labs(fill = "Ranking")
+
+ggsave("vaccine_risk_index_with_FACTOR_ANALYSIS_imputed_heatmap.pdf", dpi=300,path = "../Figures")
+```
+
+
+
+

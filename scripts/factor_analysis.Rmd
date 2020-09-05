@@ -1,0 +1,174 @@
+---
+title: "R Notebook - Factor Analysis"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+
+
+```{r}
+library(tidyverse)
+library(psych)
+library(GPArotation)
+library(lavaan)
+```
+
+
+
+
+
+
+#Factor analysis 
+
+```{r}
+d2 <- read_csv("../Processed_data/Imputed_data.csv") %>%
+  dplyr::select(
+         -"ISO_code",
+         -"Continent",
+         -"Cname")
+```
+
+
+
+#Bartlett test
+```{r}
+cortest.bartlett(d2)
+cortest.mat(d2)
+cortest.normal(d2)
+smc(d2) %>%
+data.frame()
+```
+
+
+```{r} 
+fa.parallel(d2, fm="ml", fa="both", SMC = T, sim=TRUE, show.legend = F, n.iter = 100, error.bars = F)
+```
+
+
+```{r}
+scree(d2,factors=T,pc=F,main="Scree plot",hline=NULL) 
+```
+
+
+
+
+## Using olbique rotation not orthogonal
+```{r}
+threefactor_with_climate <- fa(d2, nfactors =5,rotate = "oblimin",
+                               fm="ml", 
+                               oblique.scores = T)
+
+threefactor_with_climate$Structure
+threefactor_with_climate$communalities
+threefactor_with_climate$uniquenesses
+
+fa.sort(threefactor_with_climate)
+
+#% Variance explained
+threefactor_with_climate$Vaccounted
+
+#Eigen values
+threefactor_with_climate$e.values
+```
+
+
+#Factor analysis resulting components and relationships
+```{r, dpi=300}
+pdf(file=paste0("../Figures/Factor_analysis_components.pdf"),width=7,height=5) 
+fa.diagram(threefactor_with_climate)
+dev.off()
+
+# This numbers are factor loadings
+#The relationship of each variable to the underlying factor is expressed by the #so-called factor loading.
+```
+
+
+
+## Check Tucker Lewis index of factoring reliabilty
+```{r}
+threefactor_with_climate$TLI
+```
+Tucker Lewis Index of factoring reliability =  `{threefactor_without_climate$TLI}`
+Ideally this value should be above 0.95
+https://www.cscu.cornell.edu/news/Handouts/SEM_fit.pdf
+
+
+
+There is a difference between factor analysis output for Weight vs Loadings. In this case, we will use weight for the use in index calculation
+
+
+##Reliability alpha analysis
+```{r}
+KMO(d2)
+alpha(d2,keys=NULL, cumulative=F,na.rm=T)
+```
+
+
+
+
+#Calculate final index using factor scores
+```{r}
+d2_impute <- read_csv("../Processed_data/Imputed_data.csv") %>%
+  dplyr::select(Continent:Cname)
+
+test_impute <- factor.scores(d2,threefactor_with_climate, Phi = NULL, method = c("Thurstone"),rho=NULL)
+
+test_fa_imputed_df <- cbind(d2_impute,test_impute$scores)
+
+(test_fa_imputed_df  %>%
+  mutate(final_score=ML1+ML3+ML4+ML2+ML5) %>%
+   mutate(rank = rank(
+      -final_score, ties.method = c("random")
+    )) %>%
+  arrange(rank) %>%
+  write_csv(.,"../Processed_data/imputed_vaccine_index_using_factor_analysis_weight.csv"))
+  
+```
+
+
+## Confirmatory factor analysis using Lavaan package
+```{r}
+m3a <- 'f1 =~ MCV1_percent_coverage + measles_incidence_rate_per_100_000  + HDI_index_value 
+ f2 =~ peace_index_score + percent_refugee_origin_population  
+f3 =~ overall_vaccine_confidence_percent' 
+
+m5a <- 'f1 =~ MCV1_percent_coverage + measles_incidence_rate_per_100_000   
+ f2 =~  HDI_index_value + peace_index_score
+ f3 =~ percent_refugee_origin_population  
+f4 =~ overall_vaccine_confidence_percent
+f5 =~ climate_risk_index'
+
+onefac3items_a <- cfa(m3a, data=d2,std.lv=TRUE) 
+onefac5items_a <- cfa(m5a, data=d2,std.lv=TRUE) 
+
+summary(onefac3items_a,fit.measures=TRUE, standardized=TRUE)
+summary(onefac5items_a,fit.measures=TRUE, standardized=TRUE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+`
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,55 @@
+
+```{r}
+library(tidyverse)
+library(psych)
+source("../functions/plot_hist.R")
+```
+
+
+# Data before normalization
+
+```{r}
+d0 <- read_csv("../Processed_data/combined_final_data_frame.csv")  %>%
+     select(MCV1_percent_coverage,
+            gain_index_value,
+            urban_percent,
+            measles_incidence_rate_per_100_000,
+            HDI_index_value,
+            percent_refugee_origin_population,
+            percent_dis_conflict_population,
+            percent_dis_disaster_population,
+            climate_risk_index,
+            overall_vaccine_confidence_percent,
+            peace_index_score)
+```
+
+
+
+
+
+
+# Uncomment this chunk to generate histogram for each column
+```{r}
+#lapply( colnames(d0),function(x) plot_hist (d0,x,file_name_suffix="_before_normalization_hist_density_plot"))
+```
+
+
+
+
+
+```{r}
+skimr::skim(d0)
+```
+
+
+
+```{r}
+  bind_cols(data.frame(row.names(psych::describe(d0))), data.frame(psych::describe(d0))) %>%
+  rename("varnames"=1) %>%  
+  write_csv(.,"../Processed_data/summary_before_normalization.csv")
+```
+
+
+
+
+

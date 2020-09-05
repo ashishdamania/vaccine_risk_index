@@ -1,0 +1,110 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(psych)
+library(simputation)
+source("../functions/plot_hist.R")
+```
+
+
+
+
+
+
+```{r}
+# Get the numeric columns
+d1 <- read_csv("../Processed_data/tentative_vaccine_risk_data.csv") %>%
+      dplyr::select(-Continent,-ISO_code,-Cname)
+
+#Get the Non-numeric columns from the original data
+d2 <- read_csv("../Processed_data/tentative_vaccine_risk_data.csv") %>%
+      dplyr::select(Continent,ISO_code,Cname)
+```
+
+
+```{r}
+describe(d1)
+```
+
+
+
+
+
+#Imputation using robust regression
+```{r}
+set.seed(99, sample.kind = "Rounding")
+impute_robust_lm_df <- impute_rlm(d1, . ~ percent_refugee_origin_population + MCV1_percent_coverage + overall_vaccine_confidence_percent  + HDI_index_value + climate_risk_index + measles_incidence_rate_per_100_000 + peace_index_score, add_residual = c("observed"), init = "lts")
+```
+
+
+
+
+```{r}
+ImputedData <- cbind(d2,impute_robust_lm_df)
+
+Hmisc::describe(ImputedData)
+```
+
+
+```{r}
+#Convert negative refugee origin population percent to zero since we cannot have negative values for that variable
+ImputedData %>%
+  filter(percent_refugee_origin_population <0 )
+
+ImputedData_no_negative <- ImputedData %>%
+  mutate(percent_refugee_origin_population = case_when(
+    percent_refugee_origin_population < 0 ~ 0,
+    TRUE ~ as.numeric(percent_refugee_origin_population)
+  ))
+```
+
+
+```{r}
+write_csv(ImputedData_no_negative,"../Processed_data/Imputed_data.csv")
+```
+
+
+# Uncomment this chunk to generate histogram for each column
+```{r}
+#lapply( colnames(ImputedData[4:10]),function(x) plot_hist(ImputedData[4:10],x,file_name_suffix = "_after_imputation"))
+```
+
+
+```{r}
+describe(ImputedData) %>%
+  rownames_to_column(.,"variable_name") %>%
+  write_csv(.,"../Processed_data/summary_after_imputed_normalization.csv")
+```
+
+
+
+## Compare imputed data vs. original data
+```{r, warning=FALSE}
+PerformanceAnalytics::chart.Correlation(d1,method=c("spearman"))
+```
+
+
+
+
+
+```{r,warning=FALSE}
+ImputedData_numeric <- ImputedData %>%
+  dplyr::select(MCV1_percent_coverage:peace_index_score)
+PerformanceAnalytics::chart.Correlation(ImputedData_numeric,method=c("spearman"))
+```
+
+
+```{r}
+sessionInfo()
+```
+
+
+
+
+

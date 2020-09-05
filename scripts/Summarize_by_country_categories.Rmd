@@ -1,0 +1,159 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+library(tidyverse)
+```
+
+
+
+
+```{r}
+#Summarizing Scores by Region
+
+#Country classification downloaded from https://datahelpdesk.worldbank.org/knowledgebase/articles/906519**
+#and https://unstats.un.org/unsd/methodology/m49/
+
+
+#Get country Regions https://www.naturalearthdata.com/about/
+world_shape <- sf::st_read("../Data/ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp")
+
+
+#Get Income classification for 2017 from https://datahelpdesk.worldbank.org/knowledgebase/articles/906519
+
+
+world_bank_classification <- readxl::read_xls("../Data/World_bank_classification/OGHIST.xls", sheet = "Country Analytical History", skip = 4) %>%
+  slice(7:224) %>%
+  select(ISO_code=`...1`, country=`Bank's fiscal year:`, FY17)
+
+final_ranks<- read_csv("../Processed_data/imputed_vaccine_index_using_factor_analysis_weight.csv") 
+```
+
+
+```{r}
+#Get classification by WHO Regions
+WHO_region_classification <- read_csv("../Data/Measles_MCV1_coverage/coverage_series_copy.csv") %>%
+  select(WHO_REGION,ISO_code,Year) %>%
+  filter(Year==2017) %>%
+  distinct(WHO_REGION,ISO_code) %>%
+  mutate(WHO_REGION_FULL=case_when(
+    WHO_REGION=="EMR" ~ "Eastern Mediterranean",
+    WHO_REGION=="EUR" ~ "EUROPE",
+    WHO_REGION=="AFR" ~ "AFRICA",
+    WHO_REGION=="WPR" ~ "Western Pacific",
+    WHO_REGION=="SEAR" ~ "South-East Asia",
+    WHO_REGION=="AMR" ~ "Americas"
+  ))
+```  
+
+
+
+
+
+
+
+
+
+```{r}
+final_rank_with_country_classification <- world_shape %>%
+           mutate(ISO_A3_EH = 
+           case_when(NAME == "Norway" ~ "NOR",
+                     TRUE ~ as.character(ISO_A3_EH)
+                     )) %>%
+inner_join(final_ranks,by= c("ISO_A3_EH"="ISO_code")) %>%
+select( CONTINENT,REGION_UN,SUBREGION,REGION_WB,ISO_A3_EH,Cname,ML1,ML2,ML3,ML4,ML5,final_score,rank) %>%
+tibble() %>%
+inner_join(world_bank_classification, by =c("ISO_A3_EH"="ISO_code")) %>%
+inner_join(WHO_region_classification, by =c("ISO_A3_EH"="ISO_code")) %>%  
+  mutate(WB_income_classification= case_when(
+    FY17 == "LM" ~ "Low middle income",
+    FY17 == "L" ~ "Low income",
+    FY17== "UM" ~ "Upper middle income",
+    FY17 == "H" ~ "High income"
+  )) 
+ 
+```
+
+
+
+#Plots
+
+
+##Plot by WHO region
+```{r}
+final_rank_with_country_classification %>%
+  pivot_longer(.,cols=c(ML1,ML2,ML3,ML4,ML5), names_to="Factors") %>%
+  ggplot(., aes(x=Factors, y=value, color=WHO_REGION_FULL)) +
+  geom_boxplot() +
+  facet_grid(~WHO_REGION_FULL)+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Factor scores") +
+  theme(legend.position='none')
+ggsave("Factor_scores_by_WHO_region_classification.pdf", width = 11, dpi=300,path = "../Figures")
+```
+
+
+```{r, fig.width=6}
+final_rank_with_country_classification %>%
+  pivot_longer(.,cols=c(ML1,ML2,ML3,ML4,ML5), names_to="Factors") %>%
+  group_by(WHO_REGION_FULL, Factors) %>%
+  summarize(mean_cl_boot(value,conf.int=.95)) %>%
+  ggplot(., aes(x=Factors, y=y, color=WHO_REGION_FULL)) +
+  geom_pointrange(aes(ymin=ymin,ymax=ymax),position = position_dodge(width = 0.5)) +
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 90))
+ ggsave("Factor_scores_by_WHO_region_pointrange_classification_Factors.pdf", width = 10, dpi=300,path = "../Figures")
+
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+final_rank_with_country_classification %>%
+  pivot_longer(.,cols=c(ML1,ML2,ML3,ML4,ML5), names_to="Factors") %>%
+  ggplot(., aes(x=Factors, y=value, color=WB_income_classification)) +
+  geom_boxplot() +
+  facet_grid(~WB_income_classification)+
+  theme_bw()
+ggsave("Factor_scores_by_income_classification.pdf", width = 10, dpi=300,path = "../Figures")
+```
+
+
+
+```{r}
+final_rank_with_country_classification %>%
+  pivot_longer(.,cols=c(ML1,ML2,ML3,ML4,ML5), names_to="Factors") %>%
+  ggplot(., aes(x=Factors, y=value, color=REGION_WB)) +
+  geom_boxplot() +
+  facet_grid(~REGION_WB)+
+  theme_bw()
+
+ggsave("Factor_scores_by_World_bank_region_classification.pdf", width = 12, dpi=300,path = "../Figures")
+```
+
+
+```{r}
+final_rank_with_country_classification %>%
+  pivot_longer(.,cols=c(ML1,ML2,ML3,ML4,ML5), names_to="Factors") %>%
+  ggplot(., aes(x=Factors, y=value, color=SUBREGION)) +
+  geom_boxplot() +
+  facet_grid(~SUBREGION)+
+  theme_bw()
+
+ggsave("Factor_scores_by_sub_region_classification.pdf", width = 15, dpi=300,path = "../Figures")
+```
+
+
+

@@ -1,0 +1,516 @@
+---
+title: "prepare_data"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(width = 600)
+```
+
+
+
+
+```{r}
+library(tidyverse)
+library(ggcorrplot)
+```
+
+
+
+# Data with ISO code
+
+## Measles coverage
+```{r}
+measles_coverage_df_2017 <- read_csv("../Data/Measles_MCV1_coverage/coverage_series_copy.csv") %>%
+  filter(Vaccine=="MCV1") %>%
+  rename(MCV1_percent_coverage=Percent_covrage) %>%
+  filter(Year==2015) #Get the name of the countries along with the ISOCode. The year is not relevant
+
+  measles_coverage_df <- read_csv("../Data/Measles_MCV1_coverage/data-verbose.csv") %>%
+  filter(`YEAR (DISPLAY)`==2017) %>%
+  dplyr::select(Cname=`COUNTRY (DISPLAY)`,ISO_code=`COUNTRY (CODE)`,`Numeric`) %>%
+    inner_join(measles_coverage_df_2017, by = c("ISO_code"="ISO_code")) %>%
+    mutate(Year=as.numeric(paste0(2017))) %>%
+    dplyr::select(Continent,
+          Cname=`Cname.x`,
+           ISO_code,
+          Year,
+           MCV1_percent_coverage=`Numeric`)
+```
+
+
+
+```{r}
+measles_coverage_df %>%
+  filter(Year==2017)
+```
+
+## Gain index  
+
+https://gain.nd.edu/our-work/country-index/
+```{r}
+(gain_df <- read_csv("../Data/GAIN_resources/gain/gain.csv") %>%
+  gather(year,value,-Name,-ISO3) %>%
+  mutate(year=as.numeric(year)) %>%
+   rename("gain_index_value"="value") %>%
+   mutate(gain_index_value = round(gain_index_value, digits = 2)))
+```
+
+
+### Create  table for ISO3 country code
+```{r}
+(ISO3_code_df <- gain_df  %>%
+   filter(year==2017) %>%
+  dplyr::select(ISO3, Name))
+```
+
+
+
+## Urban population
+```{r}
+(urban_df <- readxl::read_xls("../Data/Urban_population/API_SP.URB.TOTL.IN.ZS_DS2_en_excel_v2_422330.xls", skip = 3) %>%
+  dplyr::select(-"Indicator Name", -"Indicator Code") %>%
+  gather(year, urban_percent, -`Country Name`,-`Country Code` ) %>%
+  mutate(year=as.numeric(year)) )
+```
+
+
+
+# Total population
+```{r}
+(total_population_df <- read_csv("../Data/Total_population/API_SP.POP.TOTL_DS2_en_csv_v2_422125/API_SP.POP.TOTL_DS2_en_csv_v2_422125.csv", skip = 3) %>%
+   dplyr::select(-`Indicator Name`,-`Indicator Code`) %>%
+   gather(year,population_total,-`Country Name`,-`Country Code`) %>%
+   mutate(year = as.numeric(year))
+)
+```
+
+
+# Data without country ISO code
+
+## Measles Incidence
+```{r}
+(measles_incidence_df <- read_csv("../Data/Measles_incidence/IHME-GBD_2017_DATA-88f3e762-1/IHME-GBD_2017_DATA-88f3e762-1.csv")  %>%
+  filter(age_name=="1 to 4") %>%
+  filter(metric_name=="Rate") %>%
+  filter(measure_name == "Incidence") %>%
+  dplyr::select(location_name, year, val)) 
+
+##Find which countries do not have ISO code
+(measles_incidence_df %>% 
+  left_join(ISO3_code_df, by =c("location_name"="Name")) %>%
+    filter(is.na(ISO3)) %>%
+    filter(year==2017) %>%
+    arrange(location_name))
+
+  
+(measles_incidence_df_final <- measles_incidence_df %>%
+  left_join(ISO3_code_df, by = c("location_name"="Name")) %>%
+  mutate(.,ISO3=case_when(
+  location_name == "American Samoa" ~ "ASM" ,
+  location_name =="Bermuda" ~ "BMU",
+  location_name =="Bolivia" ~"BOL",
+  location_name== "Brunei" ~ "BRN",
+  location_name=="Democratic Republic of the Congo" ~ "COD",
+  location_name=="Federated States of Micronesia" ~ "FSM",
+  location_name =="Greenland" ~ "GRL",
+  location_name=="Guam" ~ "GUM",
+  location_name=="Iran" ~ "IRN",
+  location_name =="Laos" ~ "LAO",
+  location_name== "Libya" ~ "LBY",
+  location_name=="Moldova" ~ "MDA",
+  location_name=="North Korea" ~ "PRK",
+  location_name=="Northern Mariana Islands"~ "MNP" ,
+  location_name== "Palestine"~ "PSE",
+  location_name=="Puerto Rico" ~ "PRI",
+  location_name=="South Korea" ~ "KOR",
+  location_name=="South Sudan" ~ "SSD",
+  location_name== "Syria" ~ "SYR",
+  location_name=="Slovakia" ~ "Slovak Republic",
+  location_name=="Taiwan (Province of China)" ~"TWN",
+  location_name=="Tanzania" ~ "TZA",
+  location_name=="The Bahamas" ~ "BHS",
+  location_name=="The Gambia" ~ "GMB",
+  location_name=="Venezuela" ~"VEN",
+  location_name=="Vietnam" ~ "VNM",
+  location_name=="Virgin Islands, U.S." ~ "VIR",
+  TRUE ~ as.character(ISO3)
+  )) %>%
+  rename("measles_incidence_rate_per_100_000"="val") %>%
+    mutate(measles_incidence_rate_per_100_000 = round(measles_incidence_rate_per_100_000, digits = 2)))
+```
+
+
+## HDI index
+```{r}
+(hdi_index_df <- read_csv("../Data/Human_development_index/Human Development Index (HDI).csv", skip = 1) %>%
+  select_at(vars(-contains("X"))) %>% # Remove empty columns
+  mutate_at(vars(-"HDI Rank (2017)",-"Country"),as.numeric) %>%
+  dplyr::select(-"HDI Rank (2017)") %>%
+  gather(year, value, -Country) %>%
+   mutate(year=as.numeric(year)))
+
+
+##Find which countries do not have ISO code
+(hdi_index_df %>% 
+  left_join(ISO3_code_df, by =c("Country"="Name")) %>%
+    filter(is.na(ISO3)) %>%
+    filter(year==2017) %>%
+    arrange(Country))
+
+
+(hdi_index_df_final <- hdi_index_df %>%
+  left_join(ISO3_code_df, by = c("Country"="Name")) %>%
+  mutate(.,ISO3=case_when(
+    Country == "Bolivia (Plurinational State of)" ~ "BOL",
+    Country == "Cabo Verde" ~ "CPV",
+    Country == "Congo (Democratic Republic of the)" ~ "COD",
+    Country == "C\xf4te d'Ivoire" ~ "CIV",
+    Country == "Eswatini (Kingdom of)" ~ "SWZ",
+    Country == "Hong Kong, China (SAR)" ~ "HKG",
+    Country == "Iran (Islamic Republic of)" ~ "IRN",
+    Country == "Korea (Democratic People's Rep. of)" ~ "PRK",
+    Country == "Korea (Republic of)" ~ "KOR",
+    Country == "Libya" ~ "LBY",
+    Country == "Micronesia (Federated States of)" ~ "FSM",
+    Country == "Moldova (Republic of)" ~ "MDA",
+    Country == "Palestine, State of" ~ "PSE",
+    Country == "South Sudan" ~ "SSD",
+    Country == "Tanzania (United Republic of)" ~ "TZA",
+    Country == "Venezuela (Bolivarian Republic of)" ~ "VEN",
+    TRUE ~ as.character(ISO3)
+  )) %>%
+    rename("HDI_index_value"="value") %>%
+    mutate(HDI_index_value = round(HDI_index_value, digits = 2)))
+
+
+```
+
+
+
+
+# Refugee population by originating country
+```{r}
+(refugee_origin_df <- read_csv("../Data/Refugee_origin/Refugee_Origin_API_SM.POP.REFG.OR_DS2_en_csv_v2_438456/API_SM.POP.REFG.OR_DS2_en_csv_v2_438456.csv", skip = 3) %>%
+   dplyr::select(-(`1960`:`1989`))%>%
+   dplyr::select(`Country Name`,
+          `Country Code`,
+          `1990`:`2018`) %>%
+   gather(year,refugee_origin_population,-`Country Name`,-`Country Code`) %>%
+   mutate(year=as.numeric(year)) %>%
+   inner_join(total_population_df, by =c ("Country Code","year")) %>%
+   mutate(percent_refugee_population = (refugee_origin_population/population_total)*100) %>%
+   mutate(percent_refugee_origin_population = round(percent_refugee_population, digits = 2))
+) 
+
+```
+
+
+
+# Internal displacement conflict
+```{r}
+(internal_conflict_df <- read_csv("../Data/Internal_displacement_due_to_conflict/Internal_displacement_conflict_API_VC.IDP.NWCV_DS2_en_csv_v2_465624/API_VC.IDP.NWCV_DS2_en_csv_v2_465624.csv",skip = 3) %>%
+  dplyr::select(-(`1960`:`1989`))%>%
+   dplyr::select(`Country Name`,
+          `Country Code`,
+          `1990`:`2018`) %>%
+ gather(year,internal_conflict_impacted_population,-`Country Name`,-`Country Code`) %>%
+   mutate(year=as.numeric(year)) %>%
+   inner_join(total_population_df, by =c ("Country Code","year")) %>%
+   mutate(percent_dis_conflict_population = (internal_conflict_impacted_population/population_total)*100) %>%
+   mutate(percent_dis_conflict_population = round(percent_dis_conflict_population, digits = 2))
+)
+
+internal_conflict_df %>%
+  filter(year==2017)
+```
+
+
+
+# Internal displacement disaster
+```{r}
+(internal_disaster_df <- read_csv("../Data/Internal_displacement_due_to_disaster/Internal_displacement_Disaster_API_VC.IDP.NWDS_DS2_en_csv_v2_465625/API_VC.IDP.NWDS_DS2_en_csv_v2_465625.csv",skip = 3) %>%
+  dplyr::select(-(`1960`:`1989`))%>%
+   dplyr::select(`Country Name`,
+          `Country Code`,
+          `1990`:`2018`) %>%
+ gather(year,internal_disaster_impacted_population,-`Country Name`,-`Country Code`) %>%
+  mutate(year=as.numeric(year)) %>%
+  inner_join(total_population_df, by =c ("Country Code","year")) %>%
+  mutate(percent_dis_disaster_population = (internal_disaster_impacted_population/population_total)*100) %>%
+  mutate(percent_dis_disaster_population = round(percent_dis_disaster_population, digits = 2))
+)
+```
+
+
+# Climate risk index using Germanwatch group
+https://germanwatch.org/sites/germanwatch.org/files/Global%20Climate%20Risk%20Index%202019_2.pdf
+
+```{r}
+(climate_risk_df <- readxl::read_xlsx("../Data/Climate_risk/Global Climate Risk Index 2019_2_pages.xlsx", skip=2) %>%
+    dplyr::select(1:3) %>%
+    rename("Rank"="...1", "Country"="...2", "climate_risk_index"="...3"))
+
+(climate_risk_df_final <- climate_risk_df %>%
+left_join(ISO3_code_df, by =c("Country"="Name")))
+```
+
+
+
+# Gallup poll for vaccine confidence index
+The columns refer the confidence level of people in the survey
+Please note how **overall_vaccine_confidence_percent** is calculated
+```{r}
+(vaccine_sentiment_2018 <- readxl::read_xlsx("../Data/Vaccine_sentiment/Data on Vaccine sentiment_2018.xlsx", skip = 6, sheet = "Safe") %>%
+   dplyr::select(`Geography`,`Strongly agree`,`Agree`,`Disagree`,`Strongly disagree`) %>%
+   mutate(overall_vaccine_confidence_percent = (`Strongly agree` + `Agree`) - (`Disagree`+`Strongly disagree`)) %>%
+   mutate(Geography= case_when(
+    Geography == "Bolivia" ~ "Bolivia, Plurinational State of",
+    Geography == "Congo Brazzaville" ~ "Congo",
+    Geography == "Iran" ~ "Iran, Islamic Republic of",
+    Geography == "Moldova" ~ "Republic of Moldova (the)",
+    Geography == "Libya" ~ "Libyan Arab Jamahiriya",
+    Geography == "Republic of Moldova (the)" ~ "Moldova, Republic of",
+    Geography == "Russia" ~ "Russian Federation",
+    Geography == "South Korea" ~ "Korea, Republic of",
+    Geography == "Tanzania" ~ "Tanzania, United Republic of",
+    Geography == "United States of America" ~ "United States",
+    Geography == "Venezuela" ~ "Venezuela, Bolivarian Republic of",
+    Geography == "Vietnam" ~ "Viet Nam",
+    TRUE ~ as.character(Geography)
+  )))
+
+vaccine_sentiment_2018_final <- vaccine_sentiment_2018 %>%
+  left_join(ISO3_code_df, by =c("Geography"="Name")) %>%
+  filter(!is.na(ISO3)) %>%
+  dplyr::select(Geography,ISO3,overall_vaccine_confidence_percent)
+
+# Missing countries
+(vaccine_sentiment_2018 %>%
+  left_join(ISO3_code_df, by =c("Geography"="Name")) %>%
+  filter(is.na(ISO3)))
+```
+
+
+
+# Peace index data from visionofhumanity.org
+
+Higher score indicates worse ranking
+ranking ordered from best to worse
+
+```{r}
+peace_index_2017 <- read.csv("../Data/Peace_index/PeaceIndex_2017.csv") %>%
+  {colnames(.)[2] = "peace_index_score"; .} %>%
+  mutate(Country=as.character(Country))#Rename column 2 to index_score
+  
+
+#Find which countries do not have matching names  
+(peace_index_2017  %>%
+   left_join(ISO3_code_df, by =c("Country"="Name")) %>%
+  filter(is.na(ISO3)) %>%
+    arrange(Country))
+
+(peace_index_2017_final <- peace_index_2017 %>%
+  left_join(ISO3_code_df, by = c("Country"="Name")) %>%
+  mutate(.,Country=case_when(
+    Country == "Bolivia" ~ "Bolivia, Plurinational State of",
+    Country == "Bosnia-Herzegovina" ~ "Bosnia and Herzegovina",
+    Country == "Central African Rep." ~ "Central African Republic",
+    Country == "Cote d' Ivoire" ~ "Cote d'Ivoire",
+    Country == "Dem. Rep. Congo" ~ "Congo, the Democratic Republic of",
+    Country == "Dominican Republic" ~ "Dominican Republic",
+    Country == "Eq. Guinea" ~ "Equatorial Guinea",
+    Country == "Iran" ~ "Iran, Islamic Republic of",
+    Country == "Kyrgyz_Republic" ~ "Kyrgyzstan",
+    Country == "Laos" ~ "Lao People's Democratic Republic",
+    Country == "Libya" ~ "Libyan Arab Jamahiriya",
+    Country == "Macedonia (FYR)" ~ "Macedonia",
+    Country == "Moldova" ~ "Moldova, Republic of",
+    Country == "North Korea" ~ "Korea, Democratic People's Repub",
+    Country == "Palestine" ~ "Palestine",
+    Country == "Rep of Congo" ~ "Congo",
+    Country == "Russia" ~ "Russian Federation",
+    Country == "South Korea" ~ "Korea, Republic of",
+    Country == "South Sudan" ~ "South Sudan",
+    Country == "Syria" ~ "Syrian Arab Republic",
+    Country == "Taiwan" ~ "Taiwan",
+    Country == "Tanzania" ~ "Tanzania, United Republic of",
+    Country == "The Gambia" ~ "Gambia",
+    Country == "Trinidad & Tobago" ~ "Trinidad and Tobago",
+    Country == "UAE" ~ "United Arab Emirates",
+    Country == "Venezuela" ~ "Venezuela, Bolivarian Republic of",
+    Country == "Vietnam" ~ "Viet Nam",
+    TRUE ~ as.character(Country))) %>%
+    left_join(ISO3_code_df, by = c("Country"="Name")) %>%
+    mutate(ISO3=coalesce(ISO3.x,ISO3.y)) %>%
+    dplyr::select(-ISO3.x,-ISO3.y)  %>%
+    mutate(.,ISO3 = case_when(
+      Country=="Taiwan" ~ "TWN",
+      TRUE ~ as.character(ISO3)
+    )))
+
+
+```
+
+
+
+
+# Join all table using ISO3 country codes and years
+
+```{r}
+(combined_final_df <- measles_coverage_df %>%
+  left_join(gain_df, by = c("ISO_code"="ISO3","Year"="year")) %>%
+  left_join(urban_df, by =c("ISO_code"="Country Code","Year"="year")) %>%
+  left_join(measles_incidence_df_final, by = c("ISO_code"="ISO3","Year"="year")) %>%
+  left_join(hdi_index_df_final, by = c("ISO_code"="ISO3","Year"="year")) %>%
+  left_join(refugee_origin_df, by = c("ISO_code"="Country Code", "Year"="year")) %>%
+  left_join(internal_conflict_df,by = c("ISO_code"="Country Code", "Year"="year")) %>%
+  left_join(internal_disaster_df,by = c("ISO_code"="Country Code", "Year"="year")) %>%
+  dplyr::select(Continent,
+         ISO_code,
+         Cname,
+         Year,
+         MCV1_percent_coverage,
+         "gain_index_value",
+         urban_percent,
+         measles_incidence_rate_per_100_000,
+         HDI_index_value,
+         percent_refugee_origin_population,
+         percent_dis_conflict_population,
+         percent_dis_disaster_population) %>%
+  filter(Year==2017) %>%
+  left_join(climate_risk_df_final, by =c("ISO_code"="ISO3")) %>% # Join 2017 climate risk index
+  left_join(vaccine_sentiment_2018_final, by = c("ISO_code"="ISO3")) %>% ## Join 2018 vaccine confidence index
+  left_join(peace_index_2017_final,by=c("ISO_code"="ISO3")) %>%  ## Join 2017 peace index 
+   dplyr::select(-contains("."),-Rank,-Geography))
+
+write_csv(combined_final_df,"../Processed_data/combined_final_data_frame.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+psych::describe(combined_final_df)
+```
+
+
+
+
+
+
+
+
+
+
+```{r, warning=F}
+PerformanceAnalytics::chart.Correlation(combined_final_df[,5:15], method=c("spearman"),pch=19)
+```
+
+```{r}
+psych::describe(combined_final_df[,5:15]) %>%
+  as_tibble(rownames = "id") %>%
+  mutate(percent_missing = ((max(n)-n)/max(n))*100) %>%
+  dplyr::select(id,n,percent_missing)
+```
+
+
+These results show that we need to remove **percent_dis_conflict_population** and **percent_dis_disaster_population** since they are missing more than 30% of rows. 
+
+
+```{r}
+cor_df <- cor(combined_final_df[,5:15], use="complete.obs", method="spearman")%>%
+  as.table() %>%
+  as.data.frame() %>%
+  filter(Var1!=Var2)
+
+indx <- !duplicated(t(apply(cor_df, 1, sort))) 
+cor_df[indx, ] %>%
+  mutate(abs_cor=abs(Freq)) %>%
+  filter(abs_cor > 0.70) %>%
+  rename("Spearman rho" ="Freq") 
+```
+
+
+
+```{r, warning=F}
+PerformanceAnalytics::chart.Correlation(combined_final_df[,5:15],method = c("spearman"))
+```
+
+
+```{r}
+cor.test(combined_final_df$HDI_index_value,combined_final_df$gain_index_value,method=c("spearman"))
+```
+
+```{r}
+
+for_cor_results <- combined_final_df[,5:15]%>%
+  select(`Measles vac. coverage`=`MCV1_percent_coverage`,
+         `Gain index`=`gain_index_value`,
+         `Urban population(%)`=`urban_percent`,
+         `Measles incidence rate/100,000`=`measles_incidence_rate_per_100_000`,
+         `HDI index`=`HDI_index_value`,
+         `Refugee origin population(%)`=`percent_refugee_origin_population`,
+         `Disaster conflict population(%)`=`percent_dis_conflict_population`,
+         `Climate risk index`=`climate_risk_index`,
+         `Vaccine confidence(%)`=`overall_vaccine_confidence_percent`,
+         `Peace index`=`peace_index_score`)
+  
+  
+  
+cor_results <- Hmisc::rcorr(as.matrix(for_cor_results), type=c("spearman")) 
+```
+
+
+# Correlation Plot
+```{r}
+
+pdf('../Figures/correlation_plot.pdf')
+corrplot::corrplot(cor_results$r, method = "color",
+         type = "upper", order = "hclust", number.cex = .7,
+         addCoef.col = "black", # Add coefficient of correlation
+         tl.col = "black", tl.srt = 90, # Text label color and rotation
+         # Combine with significance
+         p.mat = cor_results$P, sig.level = 0.01, insig = "blank", 
+         # hide correlation coefficient on the principal diagonal
+         diag = FALSE)
+dev.off()
+```
+
+
+#Correlation results
+```{r}
+cor_results$r[lower.tri(cor_results$r)] <- NA
+cor_results$P[lower.tri(cor_results$P)] <- NA
+
+
+cor_r_values_df <- cor_results$r  %>%
+  data.frame() %>%
+  as_tibble(rownames = "id") %>%
+  pivot_longer(-id,names_to = "variables") %>%
+  filter(id!=variables)
+
+cor_p_values_df <- cor_results$P  %>%
+  data.frame() %>%
+  as_tibble(rownames = "id") %>%
+  pivot_longer(-id,names_to = "variables") %>%
+  filter(id!=variables) 
+
+final_cor_df <- cbind(cor_r_values_df,cor_p_values_df) %>%
+  janitor::clean_names() %>%
+  dplyr::select(id,variables,"rho"=value,"P-value"=value_2) %>%
+  mutate(adjusted_pvalue=p.adjust(`P-value`,method = c("BH"))) %>%
+  mutate(adjusted_pvalue=round(adjusted_pvalue,digits = 6)) %>%
+  filter(id=="Measles vac. coverage") %>%
+  arrange(rho)
+
+```

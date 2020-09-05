@@ -1,0 +1,4 @@
+Please note that the data for Australia was missing in the coverage_series_copy.csv files and coverage_series.xls. 
+No wonder, it did not showed up in the heatmap.
+
+For this reason, new data was downloaded from the website which is present as webarchive here in the folder. 
