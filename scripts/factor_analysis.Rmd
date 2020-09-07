@@ -21,7 +21,7 @@ library(lavaan)
 
 
 
-#Factor analysis 
+# Factor analysis 
 
 ```{r}
 d2 <- read_csv("../Processed_data/Imputed_data.csv") %>%
@@ -33,7 +33,7 @@ d2 <- read_csv("../Processed_data/Imputed_data.csv") %>%
 
 
 
-#Bartlett test
+## Bartlett test
 ```{r}
 cortest.bartlett(d2)
 cortest.mat(d2)
@@ -42,12 +42,12 @@ smc(d2) %>%
 data.frame()
 ```
 
-
+## Factor analysis using maximum likelihood
 ```{r} 
 fa.parallel(d2, fm="ml", fa="both", SMC = T, sim=TRUE, show.legend = F, n.iter = 100, error.bars = F)
 ```
 
-
+## scree plot
 ```{r}
 scree(d2,factors=T,pc=F,main="Scree plot",hline=NULL) 
 ```
@@ -67,15 +67,15 @@ threefactor_with_climate$uniquenesses
 
 fa.sort(threefactor_with_climate)
 
-#% Variance explained
+# % Variance explained
 threefactor_with_climate$Vaccounted
 
-#Eigen values
+# Eigen values
 threefactor_with_climate$e.values
 ```
 
 
-#Factor analysis resulting components and relationships
+## Factor analysis resulting components and relationships
 ```{r, dpi=300}
 pdf(file=paste0("../Figures/Factor_analysis_components.pdf"),width=7,height=5) 
 fa.diagram(threefactor_with_climate)
@@ -100,7 +100,7 @@ https://www.cscu.cornell.edu/news/Handouts/SEM_fit.pdf
 There is a difference between factor analysis output for Weight vs Loadings. In this case, we will use weight for the use in index calculation
 
 
-##Reliability alpha analysis
+## Reliability alpha analysis
 ```{r}
 KMO(d2)
 alpha(d2,keys=NULL, cumulative=F,na.rm=T)
@@ -109,7 +109,7 @@ alpha(d2,keys=NULL, cumulative=F,na.rm=T)
 
 
 
-#Calculate final index using factor scores
+# Calculate final index using factor scores
 ```{r}
 d2_impute <- read_csv("../Processed_data/Imputed_data.csv") %>%
   dplyr::select(Continent:Cname)
@@ -129,7 +129,7 @@ test_fa_imputed_df <- cbind(d2_impute,test_impute$scores)
 ```
 
 
-## Confirmatory factor analysis using Lavaan package
+# Confirmatory factor analysis using Lavaan package
 ```{r}
 m3a <- 'f1 =~ MCV1_percent_coverage + measles_incidence_rate_per_100_000  + HDI_index_value 
  f2 =~ peace_index_score + percent_refugee_origin_population  

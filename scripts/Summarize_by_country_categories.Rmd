@@ -7,6 +7,7 @@ output: html_notebook
 
 ```{r}
 library(tidyverse)
+library(RColorBrewer)
 ```
 
 
@@ -74,7 +75,8 @@ inner_join(WHO_region_classification, by =c("ISO_A3_EH"="ISO_code")) %>%
     FY17 == "L" ~ "Low income",
     FY17== "UM" ~ "Upper middle income",
     FY17 == "H" ~ "High income"
-  )) 
+  )) %>%
+  rename("Vaccinations"="ML1", "Vaccine Confidence"="ML2", "Conflict"= "ML3", "Climate"="ML4", "Education & Poverty"="ML5")
  
 ```
 
@@ -86,21 +88,30 @@ inner_join(WHO_region_classification, by =c("ISO_A3_EH"="ISO_code")) %>%
 ##Plot by WHO region
 ```{r}
 final_rank_with_country_classification %>%
-  pivot_longer(.,cols=c(ML1,ML2,ML3,ML4,ML5), names_to="Factors") %>%
+  pivot_longer(.,cols=c(`Vaccinations`,`Vaccine Confidence`,`Conflict`,`Climate`,`Education & Poverty`), names_to="Factors") %>%
+  mutate(Factors = fct_relevel(Factors, levels=c("Vaccinations","Vaccine Confidence","Conflict","Climate","Education & Poverty"))) %>%
   ggplot(., aes(x=Factors, y=value, color=WHO_REGION_FULL)) +
-  geom_boxplot() +
-  facet_grid(~WHO_REGION_FULL)+
+  geom_boxplot(width=0.50,position=position_dodge(width = 0.80)) +
   theme_bw()+
-  theme(axis.text.x = element_text(angle = 90))+
-  ylab("Factor scores") +
-  theme(legend.position='none')
-ggsave("Factor_scores_by_WHO_region_classification.pdf", width = 11, dpi=300,path = "../Figures")
+  labs(color="WHO Regions") +
+  theme(text = element_text(size=18))+
+  scale_color_brewer(palette="Dark2")+
+  ylab("Factor scores")+
+  xlab("Factors") +
+  theme(strip.background = element_blank())
+  
+ggsave("../Figures/Factor_scores_by_WHO_region_classification.pdf", width = 15, height=7, dpi=300,path = "../Figures")
 ```
+
+
+
+
 
 
 ```{r, fig.width=6}
 final_rank_with_country_classification %>%
-  pivot_longer(.,cols=c(ML1,ML2,ML3,ML4,ML5), names_to="Factors") %>%
+  pivot_longer(.,cols=c(`Vaccinations`,`Vaccine Confidence`,`Conflict`,`Climate`,`Education & Poverty`), names_to="Factors") %>%
+  mutate(Factors = fct_relevel(Factors, levels=c("Vaccinations","Vaccine Confidence","Conflict","Climate","Education & Poverty"))) %>%
   group_by(WHO_REGION_FULL, Factors) %>%
   summarize(mean_cl_boot(value,conf.int=.95)) %>%
   ggplot(., aes(x=Factors, y=y, color=WHO_REGION_FULL)) +
@@ -122,7 +133,8 @@ final_rank_with_country_classification %>%
 
 ```{r}
 final_rank_with_country_classification %>%
-  pivot_longer(.,cols=c(ML1,ML2,ML3,ML4,ML5), names_to="Factors") %>%
+  pivot_longer(.,cols=c(`Vaccinations`,`Vaccine Confidence`,`Conflict`,`Climate`,`Education & Poverty`), names_to="Factors") %>%
+  mutate(Factors = fct_relevel(Factors, levels=c("Vaccinations","Vaccine Confidence","Conflict","Climate","Education & Poverty"))) %>%
   ggplot(., aes(x=Factors, y=value, color=WB_income_classification)) +
   geom_boxplot() +
   facet_grid(~WB_income_classification)+
@@ -134,7 +146,8 @@ ggsave("Factor_scores_by_income_classification.pdf", width = 10, dpi=300,path = 
 
 ```{r}
 final_rank_with_country_classification %>%
-  pivot_longer(.,cols=c(ML1,ML2,ML3,ML4,ML5), names_to="Factors") %>%
+  pivot_longer(.,cols=c(`Vaccinations`,`Vaccine Confidence`,`Conflict`,`Climate`,`Education & Poverty`), names_to="Factors") %>%
+  mutate(Factors = fct_relevel(Factors, levels=c("Vaccinations","Vaccine Confidence","Conflict","Climate","Education & Poverty"))) %>%
   ggplot(., aes(x=Factors, y=value, color=REGION_WB)) +
   geom_boxplot() +
   facet_grid(~REGION_WB)+
@@ -146,7 +159,8 @@ ggsave("Factor_scores_by_World_bank_region_classification.pdf", width = 12, dpi=
 
 ```{r}
 final_rank_with_country_classification %>%
-  pivot_longer(.,cols=c(ML1,ML2,ML3,ML4,ML5), names_to="Factors") %>%
+  pivot_longer(.,cols=c(`Vaccinations`,`Vaccine Confidence`,`Conflict`,`Climate`,`Education & Poverty`), names_to="Factors") %>%
+  mutate(Factors = fct_relevel(Factors, levels=c("Vaccinations","Vaccine Confidence","Conflict","Climate","Education & Poverty"))) %>%
   ggplot(., aes(x=Factors, y=value, color=SUBREGION)) +
   geom_boxplot() +
   facet_grid(~SUBREGION)+

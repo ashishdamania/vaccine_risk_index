@@ -9,7 +9,7 @@ library(sf)
 
 
 
-## Draw heatmap based on the ranking without climate change
+# Draw heatmap based on the ranking without climate change
 
 In 4 percentiles
 ```{r}
@@ -31,13 +31,13 @@ nc3_coords <- nc3_coords %>%
 
 
 
-#countries list
+# countries list
 ```{r}
 country_list <- read_csv("../Processed_data/imputed_vaccine_index_using_factor_analysis_weight.csv")
 ```
 
 
-#Find countries whose code does not match
+# Find countries whose code does not match
 ```{r}
 nc_label <- nc3_coords %>%
   inner_join(country_list,by= c("ISO_A3_EH"="ISO_code"))
